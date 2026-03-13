@@ -17,7 +17,7 @@ These requirements were stated directly by the user at the start of the project.
 
 ### 2.2 Connectivity
 - WiFi in **Access Point mode** — the ESP32 is the hotspot, no external router
-- SSID: `ESPCam`, Password: `ESPCam`, IP: `192.168.0.1`
+- IP: `192.168.0.1`
 
 ### 2.3 Control interface
 - **Two virtual joysticks** rendered on a mobile browser (touch-based)
