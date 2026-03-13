@@ -11,7 +11,7 @@ A self-contained FPV ground station that fits in the palm of a hand. The operato
 These requirements were stated directly by the user at the start of the project.
 
 ### 2.1 Hardware target
-- **Board**: AI-Thinker ESP32-CAM with OV2640 camera
+- **Board**: AI-Thinker ESP32-CAM with OV2640 camera https://s.click.aliexpress.com/e/_EvJLZDSp
 - **Camera sensor**: OV2640
 - **Framework**: Arduino IDE (not ESP-IDF directly)
 
