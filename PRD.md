@@ -11,13 +11,13 @@ A self-contained FPV ground station that fits in the palm of a hand. The operato
 These requirements were stated directly by the user at the start of the project.
 
 ### 2.1 Hardware target
-- **Board**: AI-Thinker ESP32-CAM with OV2640 camera https://s.click.aliexpress.com/e/_EvJLZDSp
+- **Board**: AI-Thinker ESP32-CAM with OV2640 camera
 - **Camera sensor**: OV2640
 - **Framework**: Arduino IDE (not ESP-IDF directly)
 
 ### 2.2 Connectivity
 - WiFi in **Access Point mode** — the ESP32 is the hotspot, no external router
-- IP: `192.168.0.1`
+- SSID: `ESPCam`, Password: `ESPCam`, IP: `192.168.0.1`
 
 ### 2.3 Control interface
 - **Two virtual joysticks** rendered on a mobile browser (touch-based)
@@ -106,13 +106,20 @@ These requirements were not stated upfront but emerged through technical constra
 **Requirement clarified late**: the original UI was landscape-only (side-by-side sticks with video in the center column). When the phone is held in portrait the sticks overlapped or disappeared.
 **Solution**: Replaced the flex layout with a CSS Grid layout that uses an `@media (orientation: portrait)` query to switch grid areas:
 - Landscape: `[38vw stick] [video / controls] [38vw stick]`
-- Portrait: `[video — full width]` / `[stick] [stick]` / `[controls row — full width]`
-The joystick canvas `resize()` function already listened to `orientationchange`, so it adapts stick sizes automatically.
+- Portrait: `[video — full width, 30vh fixed]` / `[stick] [stick]` / `[controls row — full width]`
+
+The portrait grid row for the stream is a **fixed `30vh`** (not `auto`). Using `auto` allowed the sticks row (`1fr`) to expand and push the video off-screen when content was tall; the fixed height guarantees the stream is always visible. `max-height: calc(30vh - 10px)` on the `<img>` keeps it inside the row with a small padding gap.
+The joystick canvas `resize()` function already listened to `orientationchange`, so stick sizes adapt automatically.
 
 ### 3.8 Config page link visibility
 
 **Problem**: The config link (`⚙ Config`) on the main page used color `#333` on a `#0d0d0d` background — effectively invisible.
 **Solution**: Changed to `color: #4af` with a `border: 1px solid #2a4a6a` — matches the blue accent color used elsewhere in the UI.
+
+### 3.9 AsyncWebServer route prefix-matching causes `/config/data` to return HTML
+
+**Problem**: The config page JavaScript's `fetch('/config/data')` returned `<!DOCTYPE html>` instead of JSON, showing the error "Unexpected token '<'". The root cause: `ESPAsyncWebServer` checks routes using `startsWith`, meaning a handler registered for `/config` also matches `/config/data` and `/config/save`. Since `/config` was registered first, it intercepted all sub-routes.
+**Solution**: Register more-specific routes before their parent: `/config/data` and `/config/save` must appear in the `webServer.on()` call sequence *before* `/config`. The server checks handlers in registration order and stops at the first match.
 
 ---
 

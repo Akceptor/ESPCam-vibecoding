@@ -1,7 +1,9 @@
 #pragma once
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include "esp_wifi.h"
 #include "config.h"
+#include "camera_stream.h"
 #include "ui_main.h"
 #include "ui_config.h"
 
@@ -113,19 +115,28 @@ static void handleConfigBody(AsyncWebServerRequest *req,
     gRebootPending = true;
 }
 
+// Returns RSSI (dBm) of the first associated WiFi station, or 0 if none connected.
+static int8_t readApRssi() {
+    wifi_sta_list_t staList;
+    if (esp_wifi_ap_get_sta_list(&staList) != ESP_OK || staList.num == 0) return 0;
+    return staList.sta[0].rssi;
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 void initWebServer() {
     wsServer.onEvent(onWsEvent);
     webServer.addHandler(&wsServer);
 
     webServer.on("/",            HTTP_GET,  handleRoot);
-    webServer.on("/config",      HTTP_GET,  handleConfigPage);
+    // Register specific sub-routes before /config — AsyncWebServer uses
+    // startsWith matching, so /config would swallow /config/data and /config/save
     webServer.on("/config/data", HTTP_GET,  handleConfigData);
-
     webServer.on("/config/save", HTTP_POST,
         [](AsyncWebServerRequest *req) {},   // headers-only callback (unused)
         NULL,                                // upload callback (unused)
         handleConfigBody);                   // body callback
+
+    webServer.on("/config",      HTTP_GET,  handleConfigPage);
 
     webServer.onNotFound([](AsyncWebServerRequest *req) {
         req->send(404, "text/plain", "Not found");
@@ -138,6 +149,20 @@ void initWebServer() {
 // Call from loop() — must be on the same core as the web server
 void webServerLoop() {
     wsServer.cleanupClients();
+
+    // Broadcast WiFi RSSI + camera FPS to all WS clients once per second
+    static unsigned long lastRssiMs    = 0;
+    static uint32_t      lastFrameCount = 0;
+    if (millis() - lastRssiMs >= 1000) {
+        lastRssiMs = millis();
+        int8_t   rssi = readApRssi();
+        uint32_t fps  = gFrameCount - lastFrameCount;
+        lastFrameCount = gFrameCount;
+        char buf[40];
+        snprintf(buf, sizeof(buf), "{\"rssi\":%d,\"fps\":%u}", (int)rssi, (unsigned)fps);
+        wsServer.textAll(buf);
+    }
+
     if (gRebootPending) {
         delay(400);
         ESP.restart();

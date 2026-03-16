@@ -48,9 +48,11 @@ static const char MAIN_PAGE_HTML[] PROGMEM = R"rawhtml(
   @media (orientation: portrait) {
     #app {
       grid-template-columns: 1fr 1fr;
-      grid-template-rows: auto 1fr auto;
+      /* Fixed stream row so video is ALWAYS visible regardless of stick/ctrl size */
+      grid-template-rows: 30vh 1fr auto;
     }
-    #stream-wrap { grid-column: 1 / -1; grid-row: 1; }
+    #stream-wrap { grid-column: 1 / -1; grid-row: 1; padding: 4px 6px 2px; }
+    #stream      { max-width: 100%; max-height: calc(30vh - 10px); }
     #left-stick  { grid-column: 1;      grid-row: 2; }
     #right-stick { grid-column: 2;      grid-row: 2; }
     #ctrl-col    { grid-column: 1 / -1; grid-row: 3;
@@ -62,7 +64,6 @@ static const char MAIN_PAGE_HTML[] PROGMEM = R"rawhtml(
     #arm-btn     { width: auto; padding: 8px 18px; font-size: 14px; }
     .fm-row      { width: auto; }
     .fm-btn      { padding: 8px 10px; }
-    #stream      { max-height: 38vh; }
   }
 
   /* ── Shared elements ────────────────────────────────────────────── */
@@ -82,6 +83,7 @@ static const char MAIN_PAGE_HTML[] PROGMEM = R"rawhtml(
     align-items: center;
     justify-content: center;
     padding: 6px 2px 3px;
+    position: relative;
   }
   #stream {
     max-width: 100%;
@@ -90,6 +92,31 @@ static const char MAIN_PAGE_HTML[] PROGMEM = R"rawhtml(
     border: 1px solid #2a2a2a;
     background: #000;
     display: block;
+  }
+  #res-badge {
+    position: absolute;
+    bottom: 10px;
+    right: 8px;
+    background: rgba(0,0,0,0.55);
+    color: #666;
+    font-size: 9px;
+    font-family: monospace;
+    padding: 2px 5px;
+    border-radius: 3px;
+    pointer-events: none;
+    letter-spacing: 0.5px;
+  }
+  #rssi-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 8px;
+    background: rgba(0,0,0,0.55);
+    font-size: 9px;
+    font-family: monospace;
+    padding: 2px 5px;
+    border-radius: 3px;
+    pointer-events: none;
+    letter-spacing: 0.5px;
   }
 
   #ctrl-col {
@@ -162,6 +189,8 @@ static const char MAIN_PAGE_HTML[] PROGMEM = R"rawhtml(
   <!-- Video stream — top-center in landscape, full-width top in portrait -->
   <div id="stream-wrap">
     <img id="stream" src="http://192.168.0.1:81/stream" alt="FPV">
+    <div id="rssi-badge"></div>
+    <div id="res-badge"></div>
   </div>
 
   <!-- Left joystick: Throttle / Yaw -->
@@ -210,6 +239,13 @@ function connectWs() {
   ws.onopen  = () => { wsOk = true;  setStatus(true);  };
   ws.onclose = () => { wsOk = false; setStatus(false); setTimeout(connectWs, 2000); };
   ws.onerror = () => ws.close();
+  ws.onmessage = e => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.rssi !== undefined) updateRssi(d.rssi);
+      if (d.fps  !== undefined) updateFps(d.fps);
+    } catch(_) {}
+  };
 }
 connectWs();
 
@@ -217,6 +253,14 @@ function setStatus(ok) {
   const el = document.getElementById('status');
   el.textContent = ok ? 'Connected' : 'Disconnected';
   el.className   = ok ? 'ok' : 'err';
+}
+
+function updateRssi(dbm) {
+  const el = document.getElementById('rssi-badge');
+  if (!el) return;
+  const filled = dbm >= -55 ? 4 : dbm >= -65 ? 3 : dbm >= -75 ? 2 : 1;
+  el.textContent = '\u2588'.repeat(filled) + '\u00b7'.repeat(4 - filled) + ' ' + dbm;
+  el.style.color = dbm >= -65 ? '#4c4' : dbm >= -75 ? '#ca4' : '#c44';
 }
 
 // Send at 50 Hz — server applies its own 100 Hz CRSF timer
@@ -409,6 +453,26 @@ function Joystick(canvasId, onChange) {
 
 new Joystick('lStick', (x, y) => { lx = x; ly = y; });
 new Joystick('rStick', (x, y) => { rx = x; ry = y; });
+
+// Resolution badge — shared helper; updated by both fetch and FPS broadcasts
+const RES_NAMES = {1:'QQVGA', 5:'QVGA', 8:'VGA'};
+let lastRes = '', lastFps = null;
+
+function updateResBadge() {
+  const el = document.getElementById('res-badge');
+  if (!el) return;
+  el.textContent = lastRes + (lastFps !== null ? ' \u00b7 ' + lastFps + 'fps' : '');
+}
+
+function updateFps(fps) {
+  lastFps = fps;
+  updateResBadge();
+}
+
+fetch('/config/data').then(r => r.json()).then(d => {
+  lastRes = RES_NAMES[d.resolution] || ('res:' + d.resolution);
+  updateResBadge();
+}).catch(() => {});
 </script>
 </body>
 </html>

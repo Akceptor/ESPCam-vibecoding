@@ -8,7 +8,7 @@ A self-contained FPV drone controller that runs on an AI-Thinker ESP32-CAM modul
 
 | Component | Detail |
 |-----------|--------|
-| Board | AI-Thinker ESP32-CAM (OV2640) https://s.click.aliexpress.com/e/_EvJLZDSp |
+| Board | AI-Thinker ESP32-CAM (OV2640) |
 | Flight controller link | UART2 via CRSF protocol |
 | TX pin (ESP32 → FC) | GPIO 14 (SD_CLK — not a strapping pin, safe when SD unused) |
 | RX pin (FC → ESP32) | GPIO 13 (SD_DATA3 — telemetry input, optional) |

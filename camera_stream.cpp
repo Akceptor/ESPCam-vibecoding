@@ -32,6 +32,8 @@
 
 static httpd_handle_t streamHttpd = NULL;
 
+volatile uint32_t gFrameCount = 0;  // read by web_server.h for FPS calculation
+
 // ── MJPEG stream handler ──────────────────────────────────────────────────────
 static esp_err_t streamHandler(httpd_req_t *req) {
     camera_fb_t *fb     = NULL;
@@ -84,6 +86,7 @@ static esp_err_t streamHandler(httpd_req_t *req) {
         }
 
         if (res != ESP_OK) break;
+        gFrameCount++;
     }
     return res;
 }
